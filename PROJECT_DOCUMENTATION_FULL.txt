@@ -1,0 +1,269 @@
+================================================================================
+ПОЛНАЯ ДОКУМЕНТАЦИЯ ПРОЕКТА ДИПЛОМНОЙ РАБОТЫ
+Employee Management Platform (EmployeeHub)
+================================================================================
+Дата: 2026
+Версия: 1.0.0
+
+================================================================================
+1. ОПИСАНИЕ ПРОЕКТА
+================================================================================
+
+EmployeeHub — веб-платформа для управления сотрудниками, учёта рабочего времени и 
+организационной структуры компании. Позволяет:
+
+- Учёт рабочего времени: вход/выход по QR-коду, ручной таймер, сканер-терминал
+- Управление компанией: создание, приглашение по коду, роли и права
+- Управление сотрудниками: члены компании, роли, иерархия
+- Статистика и отчёты: PDF, Excel, графики, heatmap активности
+- Многоязычность: английский (EN) и польский (PL)
+- Темы оформления: светлая, тёмная, high-contrast (жёлтая)
+
+Архитектура: монолитное SPA приложение с REST API backend и React frontend.
+
+================================================================================
+2. СТЕК ТЕХНОЛОГИЙ
+================================================================================
+
+BACKEND:
+- Node.js 18+
+- Express.js 4.18 — веб-сервер, REST API
+- sql.js 1.8 — SQLite в браузере/Node (файловая БД)
+- JWT (jsonwebtoken 9.0) — аутентификация
+- bcryptjs 2.4 — хеширование паролей
+- Socket.IO 4.6 — WebSocket для real-time уведомлений
+- CORS, dotenv, multer (загрузка файлов)
+- uuid, express-rate-limit
+- pdfkit, exceljs — генерация отчётов
+- qrcode — генерация QR-кодов
+- node-cron — планировщик задач
+
+FRONTEND:
+- React 18.2
+- Vite 5 — сборка и dev-сервер
+- React Router DOM 6.21 — маршрутизация
+- Axios 1.6 — HTTP-клиент
+- Socket.IO Client 4.6 — WebSocket
+- date-fns 3.0 — работа с датами
+- Framer Motion 12 — анимации
+- Lucide React — иконки
+- html5-qrcode, jsqr, qrcode.react, react-webcam — QR-коды и камера
+- react-datepicker — выбор дат
+
+БАЗА ДАННЫХ:
+- SQLite (файл backend/database/company.db)
+- Через sql.js — in-memory с возможностью сохранения в файл
+
+================================================================================
+3. СТРУКТУРА ПРОЕКТА
+================================================================================
+
+testdipl/
+├── package.json              # Root: workspaces, concurrently
+├── backend/
+│   ├── server.js             # Точка входа, Express + Socket.IO
+│   ├── config/
+│   │   ├── database.js      # sql.js wrapper, getDatabase
+│   │   └── initDb.js        # Создание таблиц, seed
+│   ├── controllers/         # Auth, Company, Role, TimeLog, Report, User
+│   ├── routes/              # Маршруты API
+│   ├── utils/               # helpers
+│   ├── database/
+│   │   └── company.db       # SQLite файл
+│   ├── uploads/             # Загруженные аватары
+│   └── reports/             # Сгенерированные отчёты
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx          # Роутинг, AuthProvider
+│   │   ├── main.jsx
+│   │   ├── index.css        # Глобальные стили, темы
+│   │   ├── contexts/
+│   │   │   └── AuthContext.jsx  # auth, company, permissions
+│   │   ├── pages/           # Landing, Login, Dashboard, Profile, Reports...
+│   │   ├── components/     # Layout, Navbar, ActivityHeatmap, LiveTimer...
+│   │   ├── services/
+│   │   │   ├── api.js      # Axios API
+│   │   │   └── socket.js   # Socket.IO client
+│   │   ├── i18n/
+│   │   │   ├── index.js    # t(), getCurrentLanguage, setLanguage
+│   │   │   └── locales/    # en.json, pl.json
+│   │   ├── utils/          # formatLocale, permissions, validation
+│   │   └── hooks/          # useIsMobile, useToast
+│   └── vite.config.js
+└── PROJECT_DOCUMENTATION_FULL.txt
+    PROJECT_DEMO_GUIDE.txt
+
+================================================================================
+4. БАЗА ДАННЫХ (СХЕМА)
+================================================================================
+
+Таблицы:
+- users: id, email, password, first_name, last_name, qr_code, avatar
+- companies: id, name, owner_id, invite_code, subscription_plan
+- company_members: user_id, company_id, role_id, joined_at
+
+- roles: id, company_id, name, permissions (JSON), hierarchy_level, is_scanner
+- time_logs: id, user_id, company_id, clock_in, clock_out, total_hours, notes
+
+- report_configs: id, company_id, name, format, fields, schedule_time
+- reports: id, company_id, file_path, file_name, format, date_from, date_to
+- invitations: id, company_id, code, created_by, max_uses, expires_at
+
+Связи: users ↔ companies (many-to-many через company_members)
+       roles привязаны к company
+       time_logs: user + company
+
+================================================================================
+5. API ENDPOINTS
+================================================================================
+
+POST   /api/auth/register
+POST   /api/auth/login
+GET    /api/auth/me
+
+POST   /api/companies
+POST   /api/companies/join
+GET    /api/companies/:id
+PUT    /api/companies/:id
+DELETE /api/companies/:id
+GET    /api/companies/:id/members
+DELETE /api/companies/:id/members/:userId
+POST   /api/companies/:id/leave
+POST   /api/companies/:id/refresh-invite-code
+
+GET    /api/roles/:companyId
+POST   /api/roles/:companyId
+PUT    /api/roles/:companyId/:roleId
+DELETE /api/roles/:companyId/:roleId
+POST   /api/roles/:companyId/assign/:userId
+
+POST   /api/time-logs/clock-in
+POST   /api/time-logs/clock-out
+GET    /api/time-logs/:companyId
+GET    /api/time-logs/:companyId/my-logs
+GET    /api/time-logs/:companyId/current-status/:userId
+
+GET    /api/reports/:companyId
+POST   /api/reports/:companyId/generate
+GET    /api/reports/:companyId/download/:reportId
+
+GET    /api/users/:userId/stats/:companyId
+
+================================================================================
+6. АУТЕНТИФИКАЦИЯ И БЕЗОПАСНОСТЬ
+================================================================================
+
+- JWT: Bearer token в Authorization header
+- Пароли: bcryptjs хеширование
+- CORS: настроен для localhost и ALLOWED_ORIGINS
+- rate-limit: ограничение запросов
+- Socket.IO: auth.token при подключении
+
+================================================================================
+7. SOCKET.IO (REAL-TIME)
+================================================================================
+
+Комнаты: company-{companyId}, user-{userId}
+События: employee-clocked-in, employee-clocked-out
+При подключении пользователь автоматически подключается в комнаты своих компаний.
+
+================================================================================
+8. РОЛИ И ПРАВА
+================================================================================
+
+Роли: Owner, Admin, Manager, HR, Scanner, Employee
+Права: permissions — JSON (view_*, create_*, manage_*, edit_*, assign_*, etc.)
+hierarchy_level: уровень доступа (1–11), для фильтрации видимости сотрудников
+
+================================================================================
+9. МЕЖДУНАРОДИЗАЦИЯ (i18n)
+================================================================================
+
+Языки: en, pl
+Хранение: localStorage preferences_language
+Функция: t("key.path") — перевод
+Переключение: window.dispatchEvent("languagechange")
+Даты: formatLocaleDate, formatDateFnsLocale, formatLocaleDuration — зависят от языка
+
+================================================================================
+10. ТЕМЫ ОФОРМЛЕНИЯ
+================================================================================
+
+data-theme: light (default), dark, high-contrast (жёлтая)
+CSS: :root, [data-theme="dark"], [data-theme="high-contrast"]
+Хранение: localStorage preferences_theme
+
+================================================================================
+11. КЛЮЧЕВЫЕ КОМПОНЕНТЫ FRONTEND
+================================================================================
+
+- AuthContext: user, selectedCompany, token, hasPermission, refreshUser
+- Layout: обёртка с Navbar
+- ActivityHeatmap: 12 месяцев, heatmap по дням недели, фиксированные ячейки
+- LiveTimer: таймер в реальном времени
+- QRCodeModal: отображение QR для clock-in/out
+- ScannerTerminal: камера для сканирования QR
+- UserProfileModal: профиль сотрудника в модалке
+- CustomSelect, CustomInput, DateRangePicker
+
+================================================================================
+12. КЛЮЧЕВЫЕ СТРАНИЦЫ
+================================================================================
+
+/ — Landing
+/login, /register — авторизация
+/company-setup — создание/присоединение к компании
+/dashboard — главная, активные сотрудники, recent logs
+/time-tracking — учёт времени, таймер
+/members — список сотрудников по ролям
+/roles — управление ролями
+/reports — отчёты (актуальные/архив), PDF/Excel
+/profile — профиль пользователя, статистика, heatmap
+/settings — настройки компании
+/preferences — язык, тема
+/scanner-terminal — терминал для сканирования QR
+
+================================================================================
+13. ЗАПУСК ПРОЕКТА
+================================================================================
+
+Установка:
+  npm install
+  npm run install:all
+
+Разработка:
+  npm run dev
+  Backend: http://localhost:5000
+  Frontend: http://localhost:5173
+
+Продакшн:
+  npm run build
+  npm start
+
+Сборка frontend в frontend/dist, backend раздаёт статику при необходимости.
+
+================================================================================
+14. ОКРУЖЕНИЕ (.env)
+================================================================================
+
+PORT=5000
+NODE_ENV=development
+DB_PATH=./database/company.db
+JWT_SECRET=...
+JWT_EXPIRE=24h
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
+UPLOAD_DIR=./uploads
+REPORTS_DIR=./reports
+
+================================================================================
+15. ФОРМАТЫ ОТЧЁТОВ
+================================================================================
+
+PDF: pdfkit
+Excel: exceljs
+Имена файлов: Report_All_Feb_2026.pdf, Report_Glowacki_25-02-2026.pdf
+Поля: пользователь, дата, часы, примечания
+
+================================================================================
+КОНЕЦ ДОКУМЕНТАЦИИ
+================================================================================
